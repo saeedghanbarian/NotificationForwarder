@@ -1,7 +1,6 @@
 package com.itsazni.notificationforwarder.data
 
 import androidx.room.Entity
-import androidx.room.Index
 import androidx.room.PrimaryKey
 
 enum class QueueStatus {
@@ -11,10 +10,7 @@ enum class QueueStatus {
     FAILED
 }
 
-@Entity(
-    tableName = "notification_queue",
-    indices = [Index(value = ["notificationKey"], unique = true)]
-)
+@Entity(tableName = "notification_queue")
 data class QueueItem(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

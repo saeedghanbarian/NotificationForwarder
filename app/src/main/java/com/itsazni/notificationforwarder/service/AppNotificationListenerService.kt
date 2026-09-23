@@ -70,6 +70,12 @@ class AppNotificationListenerService : NotificationListenerService() {
         bigText: String
     ): Boolean {
         val isGroupSummary = (notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0
+
+        // Ignore completely empty notifications
+        if (title.isBlank() && text.isBlank() && bigText.isBlank()) {
+            return true
+        }
+
         if (isGroupSummary) {
             return true
         }

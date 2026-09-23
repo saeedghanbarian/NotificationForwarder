@@ -73,4 +73,11 @@ interface QueueDao {
 
     @Query("DELETE FROM notification_queue")
     suspend fun clearAll()
+
+    @Query("""
+        UPDATE notification_queue
+        SET status = 'PENDING'
+        WHERE status = 'SENDING' AND updatedAt < :cutoff
+    """)
+    suspend fun recoverStaleSending(cutoff: Long)
 }

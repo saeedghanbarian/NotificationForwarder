@@ -47,6 +47,10 @@ class NotificationRepository(private val context: Context) {
         dao.markSending(ids, System.currentTimeMillis())
     }
 
+    suspend fun recoverStaleSending(cutoff: Long) {
+        dao.recoverStaleSending(cutoff)
+    }
+
     suspend fun markSent(id: Long) {
         dao.markSent(id, System.currentTimeMillis())
     }

@@ -19,6 +19,9 @@ class QueueWorker(
     private val webhookClient = WebhookClient()
 
     override suspend fun doWork(): Result {
+        // Recover queue items left in SENDING after a worker interruption/crash.
+        repository.recoverStaleSending(System.currentTimeMillis() - 5 * 60 * 1000L)
+
         val config = settings.readAll()
         if (!config.forwardingEnabled || config.webhookUrl.isBlank()) {
             return Result.success()
@@ -40,28 +43,39 @@ class QueueWorker(
 
         var shouldRetry = false
         items.forEach { item ->
-            val result = webhookClient.send(
-                url = config.webhookUrl,
-                method = config.webhookMethod,
-                headers = headers,
-                queryParams = queryParams,
-                payloadTemplate = config.payloadTemplateRaw,
-                item = item,
-                deviceId = deviceId
-            )
-            if (result.success) {
-                repository.markSent(item.id)
-            } else {
+            try {
+                val result = webhookClient.send(
+                    url = config.webhookUrl,
+                    method = config.webhookMethod,
+                    headers = headers,
+                    queryParams = queryParams,
+                    payloadTemplate = config.payloadTemplateRaw,
+                    item = item,
+                    deviceId = deviceId
+                )
+                if (result.success) {
+                    repository.markSent(item.id)
+                } else {
+                    val attempt = item.attemptCount + 1
+                    repository.markFailure(
+                        id = item.id,
+                        attemptCount = if (result.isPermanentFailure) config.maxRetries else attempt,
+                        maxRetry = config.maxRetries,
+                        lastError = result.message
+                    )
+                    if (!result.isPermanentFailure) {
+                        shouldRetry = true
+                    }
+                }
+            } catch (e: Exception) {
                 val attempt = item.attemptCount + 1
                 repository.markFailure(
                     id = item.id,
-                    attemptCount = if (result.isPermanentFailure) config.maxRetries else attempt,
+                    attemptCount = attempt,
                     maxRetry = config.maxRetries,
-                    lastError = result.message
+                    lastError = e.message ?: e.javaClass.simpleName
                 )
-                if (!result.isPermanentFailure) {
-                    shouldRetry = true
-                }
+                shouldRetry = true
             }
         }
 
